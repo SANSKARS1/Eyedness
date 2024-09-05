@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Report</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: auto;
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: none;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4facfe;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #00c6ff;
+        }
+        .hidden {
+            display: none;
+        }
+        .location-options {
+            margin-top: 1rem;
+        }
+        #map {
+            width: 100%;
+            height: 300px;
+            margin-top: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Incident Report Form</h2>
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="id_title">Title</label>
+                <input type="text" id="id_title" name="title" placeholder="Enter incident title" required>
+            </div>
+            <div class="form-group">
+                <label for="id_description">Description</label>
+                <textarea id="id_description" name="description" rows="4" placeholder="Describe the incident" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="id_report_type">Report Type</label>
+                <select id="id_report_type" name="report_type" required>
+                    <option value="" disabled selected>Select report type</option>
+                    <option value="public">Public Share</option>
+                    <option value="police">Police Report</option>
+                </select>
+            </div>
+            <div class="form-group hidden" id="police_info_group">
+                <div class="form-group inline">
+                    <label for="id_police_station">Police Station</label>
+                    <input type="text" id="id_police_station" name="police_station" placeholder="Enter police station name">
+                </div>
+                <div class="form-group inline">
+                    <label for="id_pincode">Pincode</label>
+                    <input type="text" id="id_pincode" name="pincode" placeholder="Enter pincode">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="id_location_option">Location Option</label>
+                <select id="id_location_option" name="location_option" required>
+                    <option value="" disabled selected>Select location option</option>
+                    <option value="manual">Enter address manually</option>
+                    <option value="current">Use my current location</option>
+                    <option value="map">Locate on map</option>
+                </select>
+            </div>
+            <div class="form-group hidden" id="manual_location_group">
+                <label for="id_location">Address</label>
+                <input type="text" id="id_location" name="location" placeholder="Enter the location where the incident occurred">
+            </div>
+            <div class="form-group hidden" id="map_group">
+                <label for="id_map">Map</label>
+                <div id="map"></div>
+                <input type="hidden" id="latitude" name="latitude">
+                <input type="hidden" id="longitude" name="longitude">
+            </div>
+            <div class="form-group">
+                <label for="id_proof_type">Proof Type</label>
+                <select id="id_proof_type" name="proof_type">
+                    <option value="none">None</option>
+                    <option value="image">Image</option>
+                    <option value="audio">Audio</option>
+                    <option value="video">Video</option>
+                </select>
+            </div>
+            <div class="form-group hidden" id="file_upload_group">
+                <label for="id_files">Upload Proof Files</label>
+                <input type="file" id="id_files" name="files" multiple accept="image/*,audio/*,video/*">
+            </div>
+            <button type="submit">Submit Report</button>
+        </form>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        document.getElementById('id_report_type').addEventListener('change', function() {
+            var reportType = this.value;
+            var policeInfoGroup = document.getElementById('police_info_group');
+
+            if (reportType === 'public') {
+                policeInfoGroup.classList.add('hidden');
+            } else if (reportType === 'police') {
+                policeInfoGroup.classList.remove('hidden');
+            } else {
+                policeInfoGroup.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('id_location_option').addEventListener('change', function() {
+            var locationOption = this.value;
+            var manualLocationGroup = document.getElementById('manual_location_group');
+            var mapGroup = document.getElementById('map_group');
+            var locationInput = document.getElementById('id_location');
+
+            manualLocationGroup.classList.add('hidden');
+            mapGroup.classList.add('hidden');
+
+            if (locationOption === 'manual') {
+                manualLocationGroup.classList.remove('hidden');
+                locationInput.focus();
+            } else if (locationOption === 'map') {
+                mapGroup.classList.remove('hidden');
+                initializeMap();
+            } else if (locationOption === 'current') {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        var lat = position.coords.latitude;
+                        var lng = position.coords.longitude;
+                        locationInput.value = `Lat: ${lat}, Lng: ${lng}`;
+                    });
+                } else {
+                    alert("Geolocation is not supported by this browser.");
+                }
+            }
+        });
+
+        function initializeMap() {
+            // Initialize map focused on India (Lat: 20.5937, Lng: 78.9629)
+            var map = L.map('map').setView([20.5937, 78.9629], 5); // Set zoom level to 5 for a country-level view
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            var marker;
+            map.on('click', function(e) {
+                var lat = e.latlng.lat;
+                var lng = e.latlng.lng;
+
+                if (marker) {
+                    marker.setLatLng(e.latlng);
+                } else {
+                    marker = L.marker(e.latlng).addTo(map);
+                }
+
+                document.getElementById('latitude').value = lat;
+                document.getElementById('longitude').value = lng;
+            });
+        }
+    </script>
+</body>
+</html>
